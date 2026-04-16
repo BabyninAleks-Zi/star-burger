@@ -78,36 +78,74 @@ def register_order(request):
         })
 
     data_order = request.data
+    errors = {}
 
-    required_fields = ['firstname', 'lastname', 'phonenumber', 'address', 'products']
-    missing_fields = [field for field in required_fields if not data_order.get(field)]
-    if missing_fields:
-        return Response({
-            'error': 'Required fields are missing',
-            'missing_fields': missing_fields,
-        }, status=status.HTTP_400_BAD_REQUEST)
+    for field in ['firstname', 'lastname', 'phonenumber', 'address']:
+        if field not in data_order or data_order.get(field) in [None, '']:
+            errors[field] = ['Обязательное поле.']
 
-    products_data = data_order['products']
-    if not isinstance(products_data, list):
-        return Response({'error': 'Products must be a list'}, status=status.HTTP_400_BAD_REQUEST)
+    products_data = data_order.get('products')
 
-    product_ids = [item.get('product') for item in products_data]
+    if 'products' not in data_order:
+        errors['products'] = ['Обязательное поле.']
+    elif not isinstance(products_data, list):
+        errors['products'] = ['Ожидался список товаров.']
+    elif not products_data:
+        errors['products'] = ['Список товаров не должен быть пустым.']
+
+    if errors:
+        return Response(errors, status=status.HTTP_400_BAD_REQUEST)
+
+    for index, item in enumerate(products_data):
+        if not isinstance(item, dict):
+            return Response(
+                {'products': [f'Элемент с индексом {index} должен быть объектом.']},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if 'product' not in item:
+            return Response(
+                {'products': [f'У элемента с индексом {index} отсутствует поле product.']},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if 'quantity' not in item:
+            return Response(
+                {'products': [f'У элемента с индексом {index} отсутствует поле quantity.']},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not isinstance(item['product'], int):
+            return Response(
+                {'products': [f'Поле product в элементе {index} должно быть целым числом.']},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not isinstance(item['quantity'], int):
+            return Response(
+                {'products': [f'Поле quantity в элементе {index} должно быть целым числом.']},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if item['quantity'] < 1:
+            return Response(
+                {'products': [f'Количество товара в элементе {index} должно быть больше 0.']},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    product_ids = [item['product'] for item in products_data]
     products = Product.objects.in_bulk(product_ids)
 
     order_items = []
-    for item in products_data:
-        product_id = item.get('product')
-        quantity = item.get('quantity')
+    for index, item in enumerate(products_data):
+        product_id = item['product']
+        quantity = item['quantity']
 
         if product_id not in products:
             return Response(
-                {'error': f'Product {product_id} does not exist'},
+                {'products': [f'Продукт с id={product_id} не существует.']},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        if not isinstance(quantity, int) or quantity < 1:
-            return Response({
-                'error': f'Invalid quantity for product {product_id}',
-            }, status=status.HTTP_400_BAD_REQUEST)
 
         order_items.append(OrderItem(
             product=products[product_id],
