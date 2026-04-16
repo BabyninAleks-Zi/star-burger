@@ -81,8 +81,18 @@ def register_order(request):
     errors = {}
 
     for field in ['firstname', 'lastname', 'phonenumber', 'address']:
-        if field not in data_order or data_order.get(field) in [None, '']:
+        if field not in data_order:
             errors[field] = ['Обязательное поле.']
+            continue
+
+        value = data_order[field]
+
+        if not isinstance(value, str):
+            errors[field] = ['Недопустимая строка']
+            continue
+
+        if not value.strip():
+            errors[field] = ['Это поле не может быть пустым.']
 
     products_data = data_order.get('products')
 
