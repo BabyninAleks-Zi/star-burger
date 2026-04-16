@@ -1,7 +1,9 @@
-import json
 from django.db import transaction
 from django.http import JsonResponse
 from django.templatetags.static import static
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
 
 
 from .models import Order, OrderItem, Product
@@ -59,26 +61,35 @@ def product_list_api(request):
     })
 
 
+@api_view(['GET', 'POST'])
 def register_order(request):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'Only POST allowed'}, status=405)
+    if request.method == 'GET':
+        return Response({
+            'detail': 'Отправьте POST с данными заказа в формате JSON.',
+            'example': {
+                'firstname': 'Иван',
+                'lastname': 'Иванов',
+                'phonenumber': '+79991234567',
+                'address': 'Москва, ул. Пушкина, д. 1',
+                'products': [
+                    {'product': 1, 'quantity': 2}
+                ]
+            }
+        })
 
-    try:
-        data_order = json.loads(request.body)
-    except json.JSONDecodeError:
-        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    data_order = request.data
 
     required_fields = ['firstname', 'lastname', 'phonenumber', 'address', 'products']
     missing_fields = [field for field in required_fields if not data_order.get(field)]
     if missing_fields:
-        return JsonResponse({
+        return Response({
             'error': 'Required fields are missing',
             'missing_fields': missing_fields,
-        }, status=400)
+        }, status=status.HTTP_400_BAD_REQUEST)
 
     products_data = data_order['products']
     if not isinstance(products_data, list):
-        return JsonResponse({'error': 'Products must be a list'}, status=400)
+        return Response({'error': 'Products must be a list'}, status=status.HTTP_400_BAD_REQUEST)
 
     product_ids = [item.get('product') for item in products_data]
     products = Product.objects.in_bulk(product_ids)
@@ -89,11 +100,14 @@ def register_order(request):
         quantity = item.get('quantity')
 
         if product_id not in products:
-            return JsonResponse({'error': f'Product {product_id} does not exist'}, status=400)
+            return Response(
+                {'error': f'Product {product_id} does not exist'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         if not isinstance(quantity, int) or quantity < 1:
-            return JsonResponse({
+            return Response({
                 'error': f'Invalid quantity for product {product_id}',
-            }, status=400)
+            }, status=status.HTTP_400_BAD_REQUEST)
 
         order_items.append(OrderItem(
             product=products[product_id],
@@ -112,7 +126,7 @@ def register_order(request):
         for order_item in order_items:
             order_item.full_clean(exclude=['order'])
     except Exception as error:
-        return JsonResponse({'error': str(error)}, status=400)
+        return Response({'error': str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     with transaction.atomic():
         order.save()
@@ -120,4 +134,4 @@ def register_order(request):
             order_item.order = order
         OrderItem.objects.bulk_create(order_items)
 
-    return JsonResponse({'status': 'ok', 'order_id': order.id})
+    return Response({'status': 'ok', 'order_id': order.id}, status=status.HTTP_201_CREATED)
