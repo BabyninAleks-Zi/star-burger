@@ -18,7 +18,7 @@ class OrderSerializer(serializers.Serializer):
     lastname = serializers.CharField()
     phonenumber = PhoneNumberField()
     address = serializers.CharField()
-    products = OrderProductSerializer(many=True, allow_empty=False)
+    products = OrderProductSerializer(many=True, write_only=True, allow_empty=False)
 
     def create(self, validated_data):
         products_data = validated_data.pop('products')

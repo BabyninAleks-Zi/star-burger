@@ -80,10 +80,9 @@ def register_order(request):
     serializer = OrderSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     order = serializer.save()
+
+    response_serializer = OrderSerializer(order)
     return Response(
-        {
-            'status': 'ok',
-            'order_id': order.id
-        },
+        response_serializer.data,
         status=status.HTTP_201_CREATED
     )
