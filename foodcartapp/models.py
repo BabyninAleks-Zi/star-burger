@@ -139,6 +139,7 @@ class Order(models.Model):
     class Status(models.TextChoices):
         NEW = 'new', 'Новый'
         PROCESSING = 'processing', 'В работе'
+        DELIVERING = 'delivering', 'Доставляется'
         DELIVERED = 'delivered', 'Доставлен'
 
     firstname = models.CharField(
