@@ -24,12 +24,13 @@ class OrderSerializer(serializers.Serializer):
     def create(self, validated_data):
         products_data = validated_data.pop('products')
         product_ids = [item['product'] for item in products_data]
-        product = Product.objects.in_bulk(product_ids)
+        products = Product.objects.in_bulk(product_ids)
         with transaction.atomic():
             order = Order.objects.create(**validated_data)
 
             order_items = []
             for item in products_data:
+                product = products[item['product']]
                 order_items.append(OrderItem(
                     order=order,
                     product_id=item['product'],

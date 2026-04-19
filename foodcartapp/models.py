@@ -172,8 +172,25 @@ class Order(models.Model):
     )
     objects = OrderQuerySet.as_manager()
     comment = models.TextField(
-        verbose_name='комментарий',
+        'комментарий',
         blank=True
+    )
+    registered_at = models.DateTimeField(
+        'дата создания',
+        auto_now_add=True,
+        db_index=True,
+    )
+    called_at = models.DateTimeField(
+        'дата звонка',
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+    delivered_at = models.DateTimeField(
+        'дата доставки',
+        null=True,
+        blank=True,
+        db_index=True,
     )
 
     class Meta:

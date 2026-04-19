@@ -141,6 +141,7 @@ class OrderAdmin(admin.ModelAdmin):
         'status',
         'created_at',
     ]
+    readonly_fields = ['registered_at']
     inlines = [
         OrderItemInline,
     ]
