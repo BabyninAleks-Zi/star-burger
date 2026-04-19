@@ -23,6 +23,8 @@ class OrderSerializer(serializers.Serializer):
     def create(self, validated_data):
         products_data = validated_data.pop('products')
         order = Order.objects.create(**validated_data)
+        product_ids = [item['product'] for item in products_data]
+        product = Product.objects.in_bulk(product_ids)
 
         order_items = []
         for item in products_data:
@@ -30,6 +32,7 @@ class OrderSerializer(serializers.Serializer):
                 order=order,
                 product_id=item['product'],
                 quantity=item['quantity'],
+                price=product.price,
             ))
 
         OrderItem.objects.bulk_create(order_items)

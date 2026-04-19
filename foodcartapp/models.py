@@ -1,12 +1,17 @@
+from decimal import Decimal
 from django.db import models
 from django.core.validators import MinValueValidator
 from phonenumber_field.modelfields import PhoneNumberField
-from django.db.models import F, Sum
+from django.db.models import F, Sum, DecimalField, ExpressionWrapper
 
 
 class OrderQuerySet(models.QuerySet):
     def with_total_cost(self):
-        return self.annotate(total_cost=Sum(F'items__quantity')*F('items__product__price'))
+        total_item_cost = ExpressionWrapper(
+            F('items__quantity')*F('items__price'),
+            output_field=DecimalField(max_digits=8, decimal_places=2)
+        )
+        return self.annotate(total_cost=Sum(total_item_cost))
 
 
 class Restaurant(models.Model):
@@ -191,6 +196,12 @@ class OrderItem(models.Model):
     quantity = models.PositiveIntegerField(
         'количество',
         validators=[MinValueValidator(1)],
+    )
+    price = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal('0.00'))],
+        verbose_name='Цена на момент заказа'
     )
 
     class Meta:

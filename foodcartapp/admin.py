@@ -19,6 +19,7 @@ class RestaurantMenuItemInline(admin.TabularInline):
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
     extra = 0
+    fields = ['product', 'quantity', 'price']
     autocomplete_fields = [
         'product',
     ]
