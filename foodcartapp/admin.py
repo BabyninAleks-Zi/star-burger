@@ -128,6 +128,7 @@ class OrderAdmin(admin.ModelAdmin):
         'address',
         'status',
         'created_at',
+        'comment'
     ]
     search_fields = [
         'id',
