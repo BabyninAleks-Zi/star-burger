@@ -3,10 +3,14 @@ from django.shortcuts import redirect, render
 from django.views import View
 from django.urls import reverse_lazy
 from django.contrib.auth.decorators import user_passes_test
+from django.conf import settings
 
 from django.contrib.auth import authenticate, login
 from django.contrib.auth import views as auth_views
 from collections import defaultdict
+import requests
+from requests.exceptions import RequestException
+from geopy.distance import distance
 
 
 from foodcartapp.models import Order, Product, Restaurant, RestaurantMenuItem
@@ -64,6 +68,95 @@ def is_manager(user):
     return user.is_staff  # FIXME replace with specific permission
 
 
+def fetch_coordinates(apikey, address):
+    geocoder_url = 'https://geocode-maps.yandex.ru/1.x'
+    response = requests.get(
+        geocoder_url,
+        params={
+            'apikey': apikey,
+            'geocode': address,
+            'format': 'json',
+        },
+        timeout=5,
+    )
+    response.raise_for_status()
+
+    found_places = response.json()['response']['GeoObjectCollection']['featureMember']
+    if not found_places:
+        return None
+
+    longitude, latitude = found_places[0]['GeoObject']['Point']['pos'].split(' ')
+    return float(latitude), float(longitude)
+
+
+def get_available_restaurants_for_order(order, restaurants_by_product, restaurant_names):
+    order_product_ids = [item.product_id for item in order.items.all()]
+    if not order_product_ids:
+        return []
+
+    available_restaurant_ids = set(restaurants_by_product.get(order_product_ids[0], set()))
+    for product_id in order_product_ids[1:]:
+        available_restaurant_ids &= restaurants_by_product.get(product_id, set())
+
+    return [
+        {
+            'id': restaurant_id,
+            'name': restaurant_names[restaurant_id],
+        }
+        for restaurant_id in available_restaurant_ids
+    ]
+
+
+def attach_restaurants_distances(orders):
+    geocoder_api_key = settings.YANDEX_GEOCODER_API_KEY
+    if not geocoder_api_key:
+        return
+
+    address_cache = {}
+    all_addresses = {
+        order.address
+        for order in orders
+        if order.restaurant_id is None and order.available_restaurants
+    }
+    all_addresses.update(
+        restaurant['address']
+        for order in orders
+        if order.restaurant_id is None
+        for restaurant in order.available_restaurants
+    )
+
+    for address in all_addresses:
+        try:
+            address_cache[address] = fetch_coordinates(geocoder_api_key, address)
+        except (RequestException, KeyError, ValueError, TypeError):
+            address_cache[address] = None
+
+    for order in orders:
+        if order.restaurant_id is not None:
+            continue
+
+        order_coordinates = address_cache.get(order.address)
+        for restaurant in order.available_restaurants:
+            restaurant_coordinates = address_cache.get(restaurant['address'])
+
+            if not order_coordinates or not restaurant_coordinates:
+                restaurant['distance_km'] = None
+                continue
+
+            restaurant['distance_km'] = round(
+                distance(order_coordinates, restaurant_coordinates).km, 1
+            )
+
+        order.available_restaurants = sorted(
+            order.available_restaurants,
+            key=lambda restaurant: (
+                restaurant['distance_km'] is None,
+                restaurant['distance_km'] if restaurant['distance_km'] is not None else 0,
+                restaurant['name'],
+            ),
+        )
+
+
 @user_passes_test(is_manager, login_url='restaurateur:login')
 def view_products(request):
     restaurants = list(Restaurant.objects.order_by('name'))
@@ -110,37 +203,31 @@ def view_orders(request):
 
     restaurants_by_product = defaultdict(set)
     restaurant_names = {}
+    restaurant_addresses = {}
     menu_items = RestaurantMenuItem.objects.filter(
         availability=True,
         product_id__in=all_order_product_ids,
-    ).values_list('product_id', 'restaurant_id', 'restaurant__name')
+    ).values_list('product_id', 'restaurant_id', 'restaurant__name', 'restaurant__address')
 
-    for product_id, restaurant_id, restaurant_name in menu_items:
+    for product_id, restaurant_id, restaurant_name, restaurant_address in menu_items:
         restaurants_by_product[product_id].add(restaurant_id)
         restaurant_names[restaurant_id] = restaurant_name
+        restaurant_addresses[restaurant_id] = restaurant_address
 
     for order in orders:
         order.available_restaurants = []
-        if order.restaurant_id:
+        if order.restaurant_id is not None:
             continue
 
-        order_product_ids = [item.product_id for item in order.items.all()]
-        if not order_product_ids:
-            continue
-
-        available_restaurant_ids = set(
-            restaurants_by_product.get(order_product_ids[0], set())
+        order.available_restaurants = get_available_restaurants_for_order(
+            order=order,
+            restaurants_by_product=restaurants_by_product,
+            restaurant_names=restaurant_names,
         )
-        for product_id in order_product_ids[1:]:
-            available_restaurant_ids &= restaurants_by_product.get(product_id, set())
+        for restaurant in order.available_restaurants:
+            restaurant['address'] = restaurant_addresses.get(restaurant['id'], '')
 
-        order.available_restaurants = sorted(
-            (
-                {'id': restaurant_id, 'name': restaurant_names[restaurant_id]}
-                for restaurant_id in available_restaurant_ids
-            ),
-            key=lambda restaurant: restaurant['name'],
-        )
+    attach_restaurants_distances(orders)
 
     return render(request, template_name='order_items.html', context={
         'order_items': orders,

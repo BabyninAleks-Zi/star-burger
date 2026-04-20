@@ -43,7 +43,12 @@
               <details>
                 <summary>Доступные рестораны</summary>
                 {% for restaurant in item.available_restaurants %}
-                  <p>{{ restaurant.name }}</p>
+                  <p>
+                    {{ restaurant.name }}
+                    {% if restaurant.distance_km is not None %}
+                      — {{ restaurant.distance_km }} км
+                    {% endif %}
+                  </p>
                 {% endfor %}
               </details>
             {% else %}
