@@ -128,6 +128,7 @@ class OrderAdmin(admin.ModelAdmin):
         'address',
         'status',
         'created_at',
+        'payment_method',
         'comment'
     ]
     search_fields = [
@@ -140,6 +141,7 @@ class OrderAdmin(admin.ModelAdmin):
     list_filter = [
         'status',
         'created_at',
+        'payment_method'
     ]
     readonly_fields = ['registered_at']
     inlines = [
