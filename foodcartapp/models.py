@@ -203,6 +203,14 @@ class Order(models.Model):
         default=PaymentMethods.CASH,
         db_index=True,
     )
+    restaurant = models.ForeignKey(
+        Restaurant,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='orders',
+        verbose_name='ресторан',
+    )
 
     class Meta:
         verbose_name = 'заказ'

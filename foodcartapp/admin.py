@@ -147,6 +147,7 @@ class OrderAdmin(admin.ModelAdmin):
     inlines = [
         OrderItemInline,
     ]
+
     def response_change(self, request, obj):
         next_url = request.GET.get('next') or request.POST.get('next')
         if next_url and url_has_allowed_host_and_scheme(
@@ -156,6 +157,11 @@ class OrderAdmin(admin.ModelAdmin):
         ):
             return redirect(next_url)
         return super().response_change(request, obj)
+
+    def save_model(self, request, obj, form, change):
+        if obj.restaurant and obj.status == Order.Status.NEW:
+            obj.status = Order.Status.PROCESSING
+        super().save_model(request, obj, form, change)
 
 
 @admin.register(OrderItem)
