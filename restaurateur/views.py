@@ -4,6 +4,7 @@ from django.views import View
 from django.urls import reverse_lazy
 from django.contrib.auth.decorators import user_passes_test
 from django.conf import settings
+from django.utils import timezone
 
 from django.contrib.auth import authenticate, login
 from django.contrib.auth import views as auth_views
@@ -14,6 +15,7 @@ from geopy.distance import distance
 
 
 from foodcartapp.models import Order, Product, Restaurant, RestaurantMenuItem
+from geocache.models import AddressCache
 
 
 class Login(forms.Form):
@@ -108,11 +110,6 @@ def get_available_restaurants_for_order(order, restaurants_by_product, restauran
 
 
 def attach_restaurants_distances(orders):
-    geocoder_api_key = settings.YANDEX_GEOCODER_API_KEY
-    if not geocoder_api_key:
-        return
-
-    address_cache = {}
     all_addresses = {
         order.address
         for order in orders
@@ -125,19 +122,15 @@ def attach_restaurants_distances(orders):
         for restaurant in order.available_restaurants
     )
 
-    for address in all_addresses:
-        try:
-            address_cache[address] = fetch_coordinates(geocoder_api_key, address)
-        except (RequestException, KeyError, ValueError, TypeError):
-            address_cache[address] = None
+    coordinates_by_address = get_coordinates_by_address(all_addresses)
 
     for order in orders:
         if order.restaurant_id is not None:
             continue
 
-        order_coordinates = address_cache.get(order.address)
+        order_coordinates = coordinates_by_address.get(order.address)
         for restaurant in order.available_restaurants:
-            restaurant_coordinates = address_cache.get(restaurant['address'])
+            restaurant_coordinates = coordinates_by_address.get(restaurant['address'])
 
             if not order_coordinates or not restaurant_coordinates:
                 restaurant['distance_km'] = None
@@ -155,6 +148,74 @@ def attach_restaurants_distances(orders):
                 restaurant['name'],
             ),
         )
+
+
+def get_coordinates_by_address(addresses):
+    if not addresses:
+        return {}
+
+    cached_addresses = AddressCache.objects.filter(address__in=addresses)
+    cached_by_address = {
+        cache_item.address: cache_item
+        for cache_item in cached_addresses
+    }
+
+    coordinates_by_address = {
+        address: (cache_item.latitude, cache_item.longitude)
+        for address, cache_item in cached_by_address.items()
+    }
+
+    stale_before = timezone.now() - settings.GEOCODER_CACHE_TTL
+    addresses_to_refresh = [
+        address
+        for address, cache_item in cached_by_address.items()
+        if cache_item.geocoded_at < stale_before
+    ]
+    addresses_to_create = [address for address in addresses if address not in cached_by_address]
+    addresses_to_fetch = addresses_to_create + addresses_to_refresh
+
+    geocoder_api_key = settings.YANDEX_GEOCODER_API_KEY
+    if not geocoder_api_key or not addresses_to_fetch:
+        return coordinates_by_address
+
+    new_cache_items = []
+    changed_cache_items = []
+    for address in addresses_to_fetch:
+        try:
+            coordinates = fetch_coordinates(geocoder_api_key, address)
+        except (RequestException, KeyError, ValueError, TypeError):
+            continue
+
+        if coordinates is None:
+            continue
+
+        latitude, longitude = coordinates
+        coordinates_by_address[address] = (latitude, longitude)
+
+        cached_item = cached_by_address.get(address)
+        if cached_item is None:
+            new_cache_items.append(AddressCache(
+                address=address,
+                latitude=latitude,
+                longitude=longitude,
+                geocoded_at=timezone.now(),
+            ))
+            continue
+
+        cached_item.latitude = latitude
+        cached_item.longitude = longitude
+        cached_item.geocoded_at = timezone.now()
+        changed_cache_items.append(cached_item)
+
+    if new_cache_items:
+        AddressCache.objects.bulk_create(new_cache_items, ignore_conflicts=True)
+    if changed_cache_items:
+        AddressCache.objects.bulk_update(
+            changed_cache_items,
+            ['latitude', 'longitude', 'geocoded_at'],
+        )
+
+    return coordinates_by_address
 
 
 @user_passes_test(is_manager, login_url='restaurateur:login')
