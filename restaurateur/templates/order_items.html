@@ -38,6 +38,8 @@
         <td>
           {% if item.restaurant %}
             {{ item.restaurant.name }}
+          {% elif item.address_not_found %}
+            Адрес не найден
           {% else %}
             {% if item.available_restaurants %}
               <details>

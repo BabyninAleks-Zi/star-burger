@@ -100,14 +100,19 @@ def attach_restaurants_distances(orders):
     coordinates_by_address = get_coordinates_by_address(all_addresses)
 
     for order in orders:
+        order.address_not_found = False
         if order.restaurant_id is not None:
             continue
 
         order_coordinates = coordinates_by_address.get(order.address)
+        if not order_coordinates:
+            order.address_not_found = True
+            continue
+
         for restaurant in order.available_restaurants:
             restaurant_coordinates = coordinates_by_address.get(restaurant['address'])
 
-            if not order_coordinates or not restaurant_coordinates:
+            if not restaurant_coordinates:
                 restaurant['distance_km'] = None
                 continue
 
