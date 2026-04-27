@@ -174,7 +174,6 @@ class Order(models.Model):
         auto_now_add=True,
         db_index=True,
     )
-    objects = OrderQuerySet.as_manager()
     comment = models.TextField(
         'комментарий',
         blank=True
@@ -200,7 +199,6 @@ class Order(models.Model):
         'способ оплаты',
         max_length=20,
         choices=PaymentMethods.choices,
-        default=PaymentMethods.CASH,
         db_index=True,
     )
     restaurant = models.ForeignKey(
@@ -211,6 +209,7 @@ class Order(models.Model):
         related_name='orders',
         verbose_name='ресторан',
     )
+    objects = OrderQuerySet.as_manager()
 
     class Meta:
         verbose_name = 'заказ'
