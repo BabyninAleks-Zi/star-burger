@@ -64,6 +64,8 @@ pip install -r requirements.txt
 - `ALLOWED_HOSTS` — список разрешённых хостов через запятую, по умолчанию `127.0.0.1,localhost`.
 - `YANDEX_GEOCODER_API_KEY` — API-ключ Яндекс Геокодера для расчёта расстояний до ресторанов в интерфейсе менеджера.
 - `GEOCODER_CACHE_TTL` — время жизни кэша геокодера в формате `DD HH:MM:SS`, по умолчанию `30 00:00:00`.
+- `ROLLBAR_ACCESS_TOKEN` — секретный `post_server_item` токен Rollbar. Если не задан, отправка ошибок в Rollbar отключена.
+- `ROLLBAR_ENVIRONMENT` — имя окружения Rollbar, по умолчанию `development` при `DEBUG=True` и `production` при `DEBUG=False`.
 
 Пример:
 
@@ -73,6 +75,8 @@ DEBUG=True
 ALLOWED_HOSTS=127.0.0.1,localhost
 YANDEX_GEOCODER_API_KEY=your-yandex-key
 GEOCODER_CACHE_TTL=30 00:00:00
+ROLLBAR_ACCESS_TOKEN=your-rollbar-post-server-item-token
+ROLLBAR_ENVIRONMENT=development
 ```
 
 Создайте файл базы данных SQLite и отмигрируйте её следующей командой:
@@ -163,6 +167,48 @@ Parcel будет следить за файлами в каталоге `bundle
 - `DEBUG` — дебаг-режим. Поставьте `False`.
 - `SECRET_KEY` — секретный ключ проекта. Он отвечает за шифрование на сайте. Например, им зашифрованы все пароли на вашем сайте.
 - `ALLOWED_HOSTS` — [см. документацию Django](https://docs.djangoproject.com/en/5.2/ref/settings/#allowed-hosts)
+- `ROLLBAR_ACCESS_TOKEN` — `post_server_item` токен Rollbar для отправки ошибок.
+- `ROLLBAR_ENVIRONMENT` — имя окружения Rollbar. Для боевого сервера используйте `production`.
+
+Пример prod-настроек:
+
+```env
+SECRET_KEY=long-random-production-secret
+DEBUG=False
+ALLOWED_HOSTS=example.com,www.example.com
+ROLLBAR_ACCESS_TOKEN=your-rollbar-post-server-item-token
+ROLLBAR_ENVIRONMENT=production
+```
+
+Файл `star_burger/.env` добавлен в `.gitignore`, поэтому секреты Rollbar и Django не должны попадать в репозиторий.
+
+### Проверить Rollbar
+
+Для проверки локальной dev-версии задайте в `star_burger/.env`:
+
+```env
+DEBUG=True
+ROLLBAR_ACCESS_TOKEN=your-rollbar-post-server-item-token
+ROLLBAR_ENVIRONMENT=development
+```
+
+Запустите сайт и спровоцируйте ошибку 500. В Rollbar должно появиться событие с окружением `development`.
+
+Для проверки prod-версии на сервере задайте:
+
+```env
+DEBUG=False
+ROLLBAR_ACCESS_TOKEN=your-rollbar-post-server-item-token
+ROLLBAR_ENVIRONMENT=production
+```
+
+Перезапустите приложение:
+
+```sh
+systemctl restart star-burger
+```
+
+После ошибки 500 в Rollbar должно появиться событие с окружением `production`.
 
 ## Цели проекта
 
