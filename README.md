@@ -62,6 +62,7 @@ pip install -r requirements.txt
 - `SECRET_KEY` — секретный ключ Django.
 - `DEBUG` — режим отладки (`True`/`False`), по умолчанию `True`.
 - `ALLOWED_HOSTS` — список разрешённых хостов через запятую, по умолчанию `127.0.0.1,localhost`.
+- `DATABASE_URL` — адрес базы данных в одном URL, например `postgres://USER:PASSWORD@HOST:PORT/DBNAME`. Если не задан, используется `db.sqlite3`.
 - `YANDEX_GEOCODER_API_KEY` — API-ключ Яндекс Геокодера для расчёта расстояний до ресторанов в интерфейсе менеджера.
 - `GEOCODER_CACHE_TTL` — время жизни кэша геокодера в формате `DD HH:MM:SS`, по умолчанию `30 00:00:00`.
 - `ROLLBAR_ACCESS_TOKEN` — секретный `post_server_item` токен Rollbar. Если не задан, отправка ошибок в Rollbar отключена.
@@ -73,6 +74,7 @@ pip install -r requirements.txt
 SECRET_KEY=django-insecure-change-me
 DEBUG=True
 ALLOWED_HOSTS=127.0.0.1,localhost
+DATABASE_URL=postgres://star_burger_user:change-me@localhost:5432/star_burger
 YANDEX_GEOCODER_API_KEY=your-yandex-key
 GEOCODER_CACHE_TTL=30 00:00:00
 ROLLBAR_ACCESS_TOKEN=your-rollbar-post-server-item-token
@@ -167,6 +169,7 @@ Parcel будет следить за файлами в каталоге `bundle
 - `DEBUG` — дебаг-режим. Поставьте `False`.
 - `SECRET_KEY` — секретный ключ проекта. Он отвечает за шифрование на сайте. Например, им зашифрованы все пароли на вашем сайте.
 - `ALLOWED_HOSTS` — [см. документацию Django](https://docs.djangoproject.com/en/5.2/ref/settings/#allowed-hosts)
+- `DATABASE_URL` — адрес Postgres в формате `postgres://USER:PASSWORD@HOST:PORT/DBNAME`.
 - `ROLLBAR_ACCESS_TOKEN` — `post_server_item` токен Rollbar для отправки ошибок.
 - `ROLLBAR_ENVIRONMENT` — имя окружения Rollbar. Для боевого сервера используйте `production`.
 
@@ -176,6 +179,7 @@ Parcel будет следить за файлами в каталоге `bundle
 SECRET_KEY=long-random-production-secret
 DEBUG=False
 ALLOWED_HOSTS=example.com,www.example.com
+DATABASE_URL=postgres://star_burger_user:strong-production-password@localhost:5432/star_burger
 ROLLBAR_ACCESS_TOKEN=your-rollbar-post-server-item-token
 ROLLBAR_ENVIRONMENT=production
 ```
@@ -209,6 +213,47 @@ systemctl restart star-burger
 ```
 
 После ошибки 500 в Rollbar должно появиться событие с окружением `production`.
+
+### Перенести данные из SQLite в Postgres
+
+Перед переключением базы выгрузите данные из текущей SQLite-базы:
+
+```sh
+python manage.py dumpdata \
+  --natural-foreign \
+  --natural-primary \
+  -e contenttypes \
+  -e auth.Permission \
+  --indent 2 \
+  > dump.json
+```
+
+Создайте базу и пользователя Postgres. Пример для Linux:
+
+```sh
+sudo -u postgres psql
+```
+
+```sql
+CREATE USER star_burger_user WITH PASSWORD 'strong-password';
+CREATE DATABASE star_burger OWNER star_burger_user;
+\q
+```
+
+Добавьте в `star_burger/.env`:
+
+```env
+DATABASE_URL=postgres://star_burger_user:strong-password@localhost:5432/star_burger
+```
+
+Примените миграции уже в Postgres и загрузите данные:
+
+```sh
+python manage.py migrate
+python manage.py loaddata dump.json
+```
+
+После успешной проверки сайт должен работать без файла `db.sqlite3`. Пароль в `DATABASE_URL` на сервере должен отличаться от примеров из README.
 
 ## Цели проекта
 
