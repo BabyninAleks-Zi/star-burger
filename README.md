@@ -68,7 +68,7 @@ pip install -r requirements.txt
 - `YANDEX_GEOCODER_API_KEY` — API-ключ Яндекс Геокодера для расчёта расстояний до ресторанов в интерфейсе менеджера.
 - `GEOCODER_CACHE_TTL` — время жизни кэша геокодера в формате `DD HH:MM:SS`, по умолчанию `30 00:00:00`.
 - `ROLLBAR_ACCESS_TOKEN` — секретный `post_server_item` токен Rollbar. Если не задан, отправка ошибок в Rollbar отключена.
-- `ROLLBAR_ENVIRONMENT` — имя окружения Rollbar, по умолчанию `development` при `DEBUG=True` и `production` при `DEBUG=False`.
+- `ROLLBAR_ENVIRONMENT` — имя окружения Rollbar. Настраивается отдельно от `DEBUG`, по умолчанию пустое.
 
 Пример:
 
