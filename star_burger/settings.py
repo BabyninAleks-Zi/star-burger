@@ -20,10 +20,7 @@ ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', ['127.0.0.1', 'localhost'])
 YANDEX_GEOCODER_API_KEY = env.str('YANDEX_GEOCODER_API_KEY', default='')
 GEOCODER_CACHE_TTL = env.timedelta('GEOCODER_CACHE_TTL', default=timedelta(days=30))
 ROLLBAR_ACCESS_TOKEN = env.str('ROLLBAR_ACCESS_TOKEN', default='')
-ROLLBAR_ENVIRONMENT = env.str(
-    'ROLLBAR_ENVIRONMENT',
-    default='development' if DEBUG else 'production',
-)
+ROLLBAR_ENVIRONMENT = env.str('ROLLBAR_ENVIRONMENT', default='')
 
 INSTALLED_APPS = [
     'foodcartapp.apps.FoodcartappConfig',
