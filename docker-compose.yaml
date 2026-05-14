@@ -1,0 +1,25 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python manage.py runserver 0.0.0.0:8000
+    ports:
+      - "8000:8000"
+    environment:
+      SECRET_KEY: django-insecure-local-docker-key
+      DEBUG: "True"
+      ALLOWED_HOSTS: "127.0.0.1,localhost,0.0.0.0"
+      DATABASE_URL: sqlite:////app/db.sqlite3
+      ROLLBAR_ACCESS_TOKEN: ""
+      ROLLBAR_ENVIRONMENT: ""
+    volumes:
+      - .:/app
+      - ./media:/app/media
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    volumes:
+      - ./bundles-src:/app/bundles-src
+      - ./bundles:/app/bundles
