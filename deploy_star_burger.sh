@@ -2,36 +2,34 @@
 
 set -e
 
-echo "Deploying Star Burger..."
+echo "Deploying Star Burger with Docker..."
 
 cd /srv/star-burger/app
 
 echo "Pulling latest code..."
 git pull --ff-only
 
-echo "Installing Python dependencies..."
-/srv/star-burger/app/venv/bin/python -m pip install -r requirements.txt
+echo "Creating static and media directories..."
+mkdir -p /var/www/star-burger/static
+mkdir -p /var/www/star-burger/media
 
-echo "Using Node.js 16.16.0..."
-export NVM_DIR="/root/.nvm"
-source "$NVM_DIR/nvm.sh"
-nvm use 16.16.0
-
-echo "Installing Node.js dependencies..."
-npm ci --no-audit --no-fund
+echo "Building Docker images..."
+docker compose -f docker-compose.production.yaml build
 
 echo "Building frontend bundles..."
-./node_modules/.bin/parcel build bundles-src/index.js --dist-dir bundles --public-url="./"
+docker compose -f docker-compose.production.yaml run --rm frontend
 
 echo "Collecting Django static files..."
-/srv/star-burger/app/venv/bin/python manage.py collectstatic --noinput
+docker compose -f docker-compose.production.yaml run --rm backend python manage.py collectstatic --noinput
 
 echo "Applying database migrations..."
-/srv/star-burger/app/venv/bin/python manage.py migrate --noinput
+docker compose -f docker-compose.production.yaml run --rm backend python manage.py migrate --noinput
 
-echo "Restarting Gunicorn service..."
-systemctl restart star-burger
-systemctl is-active --quiet star-burger
+echo "Starting Docker services..."
+docker compose -f docker-compose.production.yaml up -d db backend
+
+echo "Checking backend container..."
+docker compose -f docker-compose.production.yaml ps backend
 
 echo "Notifying Rollbar about deploy..."
 
