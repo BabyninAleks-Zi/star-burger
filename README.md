@@ -43,11 +43,7 @@ docker compose build
 docker compose run --rm backend python manage.py migrate
 ```
 
-Если нужна демо-база с товарами, загрузите фикстуры:
-
-```sh
-docker compose run --rm backend python manage.py loaddata dump.json
-```
+Если нужна демо-база с товарами, загрузите данные из `dump.json`. Подробности есть в разделе «Перенос данных» ниже.
 
 Запустите сайт:
 
@@ -145,7 +141,7 @@ docker compose -f docker-compose.production.yaml ps
 - `/media/` отдаётся Nginx из `/var/www/star-burger/media/`.
 - Остальные запросы Nginx проксирует в Gunicorn на `127.0.0.1:8000`.
 
-Перед первым деплоем установите Docker Engine и Docker Compose plugin на сервер.
+Перед первым деплоем установите Docker Engine и Docker Compose plugin на сервер. На локальной машине для продвинутого деплоя тоже нужен Docker CLI с Compose plugin: локальный клиент будет отправлять команды удалённому Docker Engine по SSH.
 
 Создайте директории для файлов, которые должны жить дольше контейнеров:
 
@@ -181,6 +177,42 @@ nginx -t
 systemctl reload nginx
 ```
 
+### Продвинутый деплой с локальной машины
+
+Скрипт `deploy_remote_docker.sh` запускается локально, но собирает образы и запускает контейнеры на сервере через `DOCKER_HOST=ssh://root@77.105.170.71`. Он не делает `git pull` на сервере: локальный Docker-клиент отправляет текущий build context удалённому Docker Engine.
+
+Перед запуском закоммитьте изменения: скрипт останавливается, если в рабочем дереве есть незакоммиченные файлы. Это нужно, чтобы хэш в Rollbar соответствовал реально задеплоенному коду.
+
+Запустите деплой:
+
+```sh
+bash deploy_remote_docker.sh
+```
+
+Если сервер отличается от стандартного, передайте его через переменную окружения:
+
+```sh
+SERVER=root@example.com bash deploy_remote_docker.sh
+```
+
+Скрипт:
+
+1. Проверяет чистоту git-дерева.
+2. Подключается к удалённому Docker Engine через SSH.
+3. Создаёт директории `/var/www/star-burger/static` и `/var/www/star-burger/media` на сервере.
+4. Собирает Docker-образы на сервере из локального build context.
+5. Собирает frontend через отдельный Node/Parcel-контейнер.
+6. Запускает `collectstatic`.
+7. Применяет миграции.
+8. Запускает `db` и `backend` через Docker Compose.
+9. Отправляет уведомление о деплое в Rollbar.
+
+Compose запускается с project name `app`, чтобы использовать те же контейнеры и volumes, что и серверный деплой.
+
+### Деплой через SSH на сервер
+
+Это запасной способ: подключиться на сервер и запустить деплойный скрипт там.
+
 Подключитесь к серверу:
 
 ```sh
@@ -194,11 +226,11 @@ cd /srv/star-burger/app
 bash deploy_star_burger.sh
 ```
 
-Скрипт деплоя:
+Скрипт `deploy_star_burger.sh`:
 
 1. Обновляет код через `git pull --ff-only`.
 2. Создаёт директории `/var/www/star-burger/static` и `/var/www/star-burger/media`.
-3. Собирает Docker-образы.
+3. Собирает Docker-образы на сервере.
 4. Собирает frontend через отдельный Node/Parcel-контейнер.
 5. Запускает `collectstatic`.
 6. Применяет миграции.
@@ -213,11 +245,7 @@ docker compose -f docker-compose.production.yaml ps
 
 ## Перенос данных
 
-Миграции создают таблицы, но не переносят записи. Для наполнения новой Docker-базы можно загрузить `dump.json`:
-
-```sh
-docker compose -f docker-compose.production.yaml run --rm backend python manage.py loaddata dump.json
-```
+Миграции создают таблицы, но не переносят записи. Для наполнения новой Docker-базы загрузите `dump.json`.
 
 Если `dump.json` сохранён в UTF-16, сначала перекодируйте его в UTF-8:
 
@@ -266,7 +294,7 @@ ROLLBAR_ACCESS_TOKEN=your-rollbar-post-server-item-token
 ROLLBAR_ENVIRONMENT=production
 ```
 
-После успешного запуска `bash deploy_star_burger.sh` в Rollbar должен появиться deploy с хэшем последнего коммита.
+После успешного запуска `bash deploy_remote_docker.sh` или `bash deploy_star_burger.sh` в Rollbar должен появиться deploy с хэшем последнего коммита.
 
 ## Цели проекта
 

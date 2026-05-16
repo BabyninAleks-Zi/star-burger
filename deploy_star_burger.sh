@@ -6,6 +6,10 @@ echo "Deploying Star Burger with Docker..."
 
 cd /srv/star-burger/app
 
+COMPOSE_PROJECT_NAME="app"
+COMPOSE_FILE="docker-compose.production.yaml"
+COMPOSE=(docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE")
+
 echo "Pulling latest code..."
 git pull --ff-only
 
@@ -14,22 +18,22 @@ mkdir -p /var/www/star-burger/static
 mkdir -p /var/www/star-burger/media
 
 echo "Building Docker images..."
-docker compose -f docker-compose.production.yaml build
+"${COMPOSE[@]}" build
 
 echo "Building frontend bundles..."
-docker compose -f docker-compose.production.yaml run --rm frontend
+"${COMPOSE[@]}" run --rm frontend
 
 echo "Collecting Django static files..."
-docker compose -f docker-compose.production.yaml run --rm backend python manage.py collectstatic --noinput
+"${COMPOSE[@]}" run --rm backend python manage.py collectstatic --noinput
 
 echo "Applying database migrations..."
-docker compose -f docker-compose.production.yaml run --rm backend python manage.py migrate --noinput
+"${COMPOSE[@]}" run --rm backend python manage.py migrate --noinput
 
 echo "Starting Docker services..."
-docker compose -f docker-compose.production.yaml up -d db backend
+"${COMPOSE[@]}" up -d db backend
 
 echo "Checking backend container..."
-docker compose -f docker-compose.production.yaml ps backend
+"${COMPOSE[@]}" ps backend
 
 echo "Notifying Rollbar about deploy..."
 
