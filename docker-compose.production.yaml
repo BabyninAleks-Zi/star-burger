@@ -18,7 +18,7 @@ services:
     environment:
       SECRET_KEY: django-insecure-local-production-test-key
       DEBUG: "False"
-      ALLOWED_HOSTS: "127.0.0.1,localhost"
+      ALLOWED_HOSTS: "star-burger.online,www.star-burger.online,77.105.170.71,127.0.0.1,localhost"
       DATABASE_URL: postgres://star_burger:star_burger@db:5432/star_burger
       ROLLBAR_ACCESS_TOKEN: ""
       ROLLBAR_ENVIRONMENT: ""
